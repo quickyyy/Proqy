@@ -1,15 +1,17 @@
 import os
+import sys
 import time
 import requests
 from concurrent.futures import ThreadPoolExecutor
 from modules.log import log
+import modules.configworker as cfgworker
+import modules.formatter as formatter
 
 valid = 0
 nonvalid = 0
 allproxy = 0
 workers = 5
-
-PROXY_TYPES = ['http', 'socks4', 'socks5']
+checked_proxies = 0  # Add this to track checked proxies
 
 
 def print_end(goodp, baadp):
@@ -24,11 +26,12 @@ def print_end(goodp, baadp):
 
 def calc_estimate_time(proxylen, workers):
     if proxylen > 0 and workers > 0:
-        approx_time = (allproxy / workers) * 5 * len(PROXY_TYPES)
+        approx_time = (proxylen / workers) * 5 * len(PROXY_TYPES)
         approx_time_min = approx_time / 60
-        log.info(f"Estimated time for proxy check: {approx_time_min:.1f} min ({approx_time:.0f} seconds)")
+        log.info(f"Estimated time for proxy check: {approx_time_min:.1f} min ({approx_time:.0f} seconds)", module='_calctime_')
     else:
-        log.error("Invalid number of proxies or workers.")
+        log.error("Invalid number of proxies or workers.", module='_calctime_')
+
 def load_proxies(file_path):
     with open(file_path, 'r') as file:
         lines = file.readlines()
@@ -37,12 +40,10 @@ def load_proxies(file_path):
         proxies = [line.strip() for line in lines]
         return proxies
 
-
 def save_valid(proxy, proxy_type):
     file_path = f'valid_proxies_{proxy_type}.txt'
     with open(file_path, 'a') as file:
         file.write(f"{proxy}\n")
-
 
 def parse_proxy(proxy, proxy_type):
     if '@' in proxy:
@@ -58,70 +59,67 @@ def parse_proxy(proxy, proxy_type):
             "https": f'{proxy_type}://{proxy}',
         }
 
-
 def check_proxy(proxy):
-    global valid, nonvalid
-
+    global valid, nonvalid, checked_proxies
     for proxy_type in PROXY_TYPES:
         proxies = parse_proxy(proxy, proxy_type)
+
         try:
-            response = requests.get(test_url, proxies=proxies, timeout=5)
+            response = requests.get(config['url'], proxies=proxies, timeout=int(config['response_timeout']))
             if response.status_code == 200:
-                log.info(f'{proxy} works as {proxy_type}')
+                log.info(f'{proxy} works as {proxy_type} | Remains: {allproxy - checked_proxies}', module='Proqy')
                 save_valid(proxy, proxy_type)
                 valid += 1
+                checked_proxies += 1  # Increment checked proxies
                 return f"{proxy} is working as {proxy_type}."
             else:
-                if not printinvalid:
-                    log.error(f'{proxy} does not work as {proxy_type}')
+                if config['print_invalid']:
+                    log.error(f'{proxy} does not work as {proxy_type} | Remains: {allproxy - checked_proxies}', module='Proqy')
         except Exception as e:
-            if not printinvalid:
-                log.error(f'{proxy}/{proxy_type}')
+            if config['print_invalid']:
+                log.error(f'Error checking {proxy}/{proxy_type} | Remains: {allproxy - checked_proxies}', module='Proqy')
 
     nonvalid += 1
+    checked_proxies += 1  # Increment checked proxies even for non-valid proxies
+    #proxies_left = allproxy - checked_proxies
+    #log.info(f"{proxies_left} proxies left to check.")
+
     return f"{proxy} is not valid for any proxy type."
 
-
 def check_proxies_threaded(proxies):
-    log.info('Starting checking proxies')
-    with ThreadPoolExecutor(max_workers=workers) as executor:
+    with ThreadPoolExecutor(max_workers=int(config['threads'])) as executor:
         results = list(executor.map(check_proxy, proxies))
     return results
-
 
 def main(proxy_file):
     log.debug('Initialization...')
     global allproxy, nonvalid, valid
     proxies = load_proxies(proxy_file)
-    log.info(f'Loaded {len(proxies)} proxies')
-    calc_estimate_time(len(proxies), workers)
+    log.info(f'Loaded {len(proxies)} proxies', module='Parser')
+    proxies = formatter.remove_duplicate_proxies(proxies)
+    calc_estimate_time(len(proxies), int(config['threads']))
     start_time = time.time()
-    log.debug(f'Starting work in {start_time}')
+    #log.debug(f'Starting work in {start_time}', module='debugtime')
     check_proxies_threaded(proxies)
     end_time = time.time()
     total_time = end_time - start_time
-    log.debug(f'All proxies checked in {total_time:.0f} seconds.')
+    log.debug(f'All proxies checked in {total_time:.0f} seconds.', module='debugtime')
     print_end(valid, nonvalid)
-    log.debug(f'Valid: {valid} | Nonvalid: {nonvalid} | Total: {allproxy} / Pinging site: {test_url}')
+    log.debug(f'Valid: {valid} | Nonvalid: {nonvalid} | Total: {allproxy} / Pinging site: {config["url"]}', module='Proqy')
 
 
 if __name__ == "__main__":
     os.system('cls')
     log.info('Welcome to Proqy')
-    log.info('You can find me here - https://github.com/quickyyy/Proqy | Or here - @bredcookie')
+    log.info('You can find me here - https://github.com/quickyyy/Proqy | Or here - t.me/bredcookie')
     os.system('title "Proqy - proxy checker by @bredcookie')
-    test_url = log.input('Which site going to test? (Default: https://httpbin.org): ')
-    if test_url == '':
-        log.debug('The site being tested is not specified. Will use httpbin.org')
-        test_url = 'https://httpbin.org/ip'
-    workers = int(log.input('How many workers do you want to use? (Default: 15): '))
-    if workers == '':
-        workers = 15
-    printinvalid = bool(log.input('Do you want to print invalid proxies? (True/False) (Default: True): '))
-    if printinvalid == '':
-        printinvalid = True
-    proxy_file = log.input('Enter path to proxy file (Default: proxies.txt): ')
-    proxy_type = log.input('You know what type of proxy you would like to check? (https/socks4/socks5) (leave blank clear for check all types): ').lower()
-    if proxy_type != '':
-        PROXY_TYPES = [proxy_type]
-    main(proxy_file)
+    if os.path.exists('config.k3'):
+        config = cfgworker.cfgread()
+        config = cfgworker.checksettings(config)
+        if bool(config['bruteforce_type']):
+            PROXY_TYPES = ['http', 'socks4', 'socks5']
+        else:
+            PROXY_TYPES = [config['proxy_type']]
+        main(config['proxy_file'])
+        log.info('All proxies checked! Have a nice day!')
+        sys.exit(0)

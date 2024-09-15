@@ -9,8 +9,8 @@ init(autoreset=True)
 class Logger:
     LEVEL_COLORS = {
         'INFO': Fore.GREEN,
-        'WARNING': Fore.YELLOW,
-        'ERROR': Fore.RED,
+        'WARN': Fore.YELLOW,
+        'ERR': Fore.RED,
         'DBG': Fore.CYAN,
         'INPUT': Fore.MAGENTA
     }
@@ -24,24 +24,27 @@ class Logger:
         ch.setFormatter(formatter)
         self.logger.addHandler(ch)
 
-    def log(self, level, message):
+    def log(self, level, message, module = None):
         now = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
         color = self.LEVEL_COLORS.get(level, Fore.WHITE)
-        log_message = f"{color}[{now.split()[1]}] [{level}]{Style.RESET_ALL} {message}"
+        if module:
+            log_message = f"{color}[{now.split()[1]}] [{level}] [{module}] {Style.RESET_ALL} {message}"
+        else:
+            log_message = f"{color}[{now.split()[1]}] [{level}] {Style.RESET_ALL} {message}"
         colored_message = f"{log_message}"
         self.logger.debug(colored_message)
 
-    def info(self, message):
-        self.log('INFO', message)
+    def info(self, message, module = None):
+        self.log('INFO', message, module)
 
-    def warning(self, message):
-        self.log('WARN', message)
+    def warning(self, message, module = None):
+        self.log('WARN', message, module)
 
-    def error(self, message):
-        self.log('ERR', message)
+    def error(self, message, module = None):
+        self.log('ERR', message, module)
 
-    def debug(self, message):
-        self.log('DBG', message)
+    def debug(self, message, module = None):
+        self.log('DBG', message, module)
 
     def input(self, prompt):
         time.sleep(0.2)
@@ -53,4 +56,3 @@ class Logger:
 
 
 log = Logger()
-

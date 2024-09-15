@@ -1,0 +1,12 @@
+[Main]
+proxy_file =
+url = https://google.com/
+threads = 15
+
+[Proxy]
+bruteforce_type = False
+proxy_type = socks5
+response_timeout = 15
+
+[Log]
+print_invalid = False
