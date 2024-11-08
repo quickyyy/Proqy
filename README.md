@@ -12,4 +12,4 @@ There is nothing more to say, just a useful utility.
 
 # You can open an issue or discussion about bugs and suggestions
 # Contact me
- Me in telegram - [@bredcookie](https://t.me/bredcookie) / [@quicky_lzt](https://t.me/quicky_lzt)
+ Me in telegram - [@bredcookie](https://t.me/bredcookie) / [@k3kzia](https://t.me/k3kzia)
